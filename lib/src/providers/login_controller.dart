@@ -1,0 +1,140 @@
+import 'dart:developer';
+import 'dart:io';
+
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:sample/src/models/user_model.dart';
+import 'package:sample/src/repo/auth_repo.dart';
+import 'package:sample/src/util/app_navigation.dart';
+import 'package:sample/src/util/app_routes.dart';
+
+import '../config/messages.dart';
+import '../data/rest_client.dart';
+import '../util/circle_progress.dart';
+import '../util/snack.dart';
+
+class AuthController with ChangeNotifier {
+  final token = AuthRepo.token;
+  String? contactNumber;
+  UserData? userData;
+
+  bool _isLoading = false;
+  bool get isLoading => _isLoading;
+
+  Future<void> login(String email, String password) async {
+    _isLoading = true;
+    notifyListeners();
+    showCircle();
+
+    try {
+      final loginResponse = await restApi.login(
+        email: email,
+        password: password,
+      );
+
+      if (loginResponse.IsSuccess == true) {
+        userData = loginResponse.Data;
+        AuthRepo.token = loginResponse.Token;
+        AuthRepo.loginId = loginResponse.Data?.id;
+        AuthRepo.user = loginResponse.Data?.name;
+        AuthRepo.contact = loginResponse.Data?.contactNumber;
+        String? roleName;
+        if (userData?.roles != null) {
+          roleName = userData?.roles?.Name;
+        }
+        AuthRepo.role = roleName;
+        notifyListeners();
+        NavigationService().pushNavigation(
+          Screenroutes.dashboard,
+          arguments: {'role': roleName},
+        );
+      } else {
+        showErrorSnack(Messages.authenticationFailure);
+      }
+    } catch (e) {
+      if (e is TypeError) {
+        if (e is DioException) {
+          log("TypeError", stackTrace: e.stackTrace);
+        }
+        log("TypeError", stackTrace: e.stackTrace);
+      }
+      showErrorSnack(Messages.authenticationFailure);
+    }
+
+    _isLoading = false;
+    notifyListeners();
+    removeCircle();
+  }
+
+  Future<bool> logout(int? loginId) async {
+    showCircle();
+
+    try {
+      if (token == null) {
+        throw Exception("No Token Found");
+      }
+      await restApi.logout(token: 'Bearer $token', id: AuthRepo.loginId);
+      AuthRepo.logOut();
+      removeCircle();
+      return true;
+    } catch (e) {
+      if (e is DioException) {
+        print("Dio Exception $e");
+      }
+      return false;
+    }
+  }
+
+  Future<bool> changePassword(
+    String? currentPassword,
+    String? newPassword,
+  ) async {
+    showCircle();
+
+    try {
+      if (token == null) {
+        throw Exception("No Token Found");
+      }
+      await restApi.changePassword(
+        token: 'Bearer $token',
+        currentPassword: currentPassword,
+        password: newPassword,
+      );
+      return true;
+    } catch (e) {
+      if (e is DioException) {
+        print("Dio Exception $e");
+      }
+      return false;
+    }
+  }
+
+  Future<bool> userUpdate(
+    String? name,
+    String? contactNumber,
+    File? imageFile,
+  ) async {
+    showCircle();
+
+    try {
+      if (token == null) {
+        throw Exception("No Token Found");
+      }
+      await restApi.userUpdate(
+        token: 'Bearer $token',
+        name: name,
+        contactNumber: contactNumber,
+        file: imageFile,
+      );
+      AuthRepo.user = name;
+      AuthRepo.contact = contactNumber;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      if (e is DioException) {
+        print("Dio Exception $e");
+      }
+      return false;
+    }
+  }
+}

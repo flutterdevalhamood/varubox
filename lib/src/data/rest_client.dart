@@ -1,0 +1,65 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart';
+import 'package:retrofit/retrofit.dart';
+import 'package:sample/src/constants/api_constants.dart';
+import 'package:sample/src/models/user_model.dart';
+
+part 'rest_client.g.dart';
+
+var dio = Dio();
+var restApi = RestClient(dio, baseUrl: apiEndPoint);
+
+@RestApi(baseUrl: apiEndPoint)
+abstract class RestClient {
+  factory RestClient(Dio dio, {String baseUrl}) = _RestClient;
+
+  @POST('/api/register')
+  Future<dynamic> signUp({
+    @Field("email") String? email,
+    @Field("password") String? password,
+  });
+
+  @POST('/api/verifyOtp')
+  Future<dynamic> verifyOtp({
+    @Field("email") String? email,
+    @Field("password") String? password,
+    @Field("otp") String? otp,
+  });
+
+  @POST('/api/Login')
+  Future<UserModel> login({
+    @Field("email") String? email,
+    @Field("password") String? password,
+  });
+
+  @POST('/api/Logout')
+  Future<dynamic> logout({
+    @Header("Authorization") String? token,
+    @Field("id") int? id,
+  });
+
+  @POST('/api/UserChangePassword')
+  Future<dynamic> changePassword({
+    @Header("Authorization") String? token,
+    @Field("currentPassword") String? currentPassword,
+    @Field("password") String? password,
+  });
+
+  @POST('/api/UserUpdate')
+  @MultiPart()
+  Future<dynamic> userUpdate({
+    @Header("Authorization") String? token,
+    @Part(name: "name") String? name,
+    @Part(name: "contactNumber") String? contactNumber,
+    @Part(name: "imageUrl") File? file,
+  });
+
+  @POST('/api/ExpenseDelete')
+  @FormUrlEncoded()
+  Future<dynamic> deleteExpense({
+    @Header("Authorization") String? token,
+    @Field("id") int? id,
+    @Field("deleteDescription") String? description,
+  });
+}
