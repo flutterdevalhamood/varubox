@@ -136,7 +136,12 @@ class _RestClient implements RestClient {
     final _data = {'currentPassword': currentPassword, 'password': password};
     _data.removeWhere((k, v) => v == null);
     final _options = _setStreamType<dynamic>(
-      Options(method: 'POST', headers: _headers, extra: _extra)
+      Options(
+            method: 'POST',
+            headers: _headers,
+            extra: _extra,
+            contentType: 'application/x-www-form-urlencoded',
+          )
           .compose(
             _dio.options,
             '/api/UserChangePassword',

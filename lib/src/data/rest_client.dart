@@ -40,6 +40,7 @@ abstract class RestClient {
   });
 
   @POST('/api/UserChangePassword')
+  @FormUrlEncoded()
   Future<dynamic> changePassword({
     @Header("Authorization") String? token,
     @Field("currentPassword") String? currentPassword,

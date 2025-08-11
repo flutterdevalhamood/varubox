@@ -98,7 +98,11 @@ class AccountScreen extends StatelessWidget {
                         Icons.person_outline,
                         'About me',
                         Colors.green,
-                        () {},
+                        () {
+                          NavigationService().pushNavigation(
+                            Screenroutes.aboutMe,
+                          );
+                        },
                       ),
                       _buildMenuItem(
                         Icons.shopping_bag_outlined,

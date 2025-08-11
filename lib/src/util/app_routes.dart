@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sample/src/screens/about_me_screen.dart';
 import 'package:sample/src/screens/dashboard_screen.dart';
 import 'package:sample/src/screens/login_screen.dart';
 import 'package:sample/src/screens/verify_otp_screen.dart';
@@ -15,6 +16,7 @@ class Screenroutes {
   static const String verifyOtp = "verifyOtp";
   static const String loginScreen = "login";
   static const String dashboard = "DashBoard";
+  static const String aboutMe = "aboutMe";
 
   static Route<dynamic>? routes(RouteSettings settings) {
     StringConstants.currentRoute = settings.name ?? "";
@@ -59,6 +61,14 @@ class Screenroutes {
           settings: const RouteSettings(name: Screenroutes.dashboard),
           builder: (BuildContext context) {
             return DashboardScreen();
+          },
+        );
+
+      case Screenroutes.aboutMe:
+        return MaterialPageRoute(
+          settings: const RouteSettings(name: Screenroutes.aboutMe),
+          builder: (BuildContext context) {
+            return AboutMeScreen();
           },
         );
     }
