@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:sample/src/providers/dashboard_controller.dart';
 import 'package:sample/src/providers/login_controller.dart';
+import 'package:sample/src/providers/product_detail_controller.dart';
 import 'package:sample/src/repo/auth_repo.dart';
 import 'package:sample/src/util/shared_pref.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,6 +22,8 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (context) => AuthController()),
         ChangeNotifierProvider(create: (context) => SignUpController()),
+        ChangeNotifierProvider(create: (context) => DashboardController()),
+        ChangeNotifierProvider(create: (context) => ProductDetailController()),
       ],
       child: const BaseScreen(),
     ),

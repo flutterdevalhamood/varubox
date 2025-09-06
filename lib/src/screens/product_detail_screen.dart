@@ -1,12 +1,13 @@
-// product_detail_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'package:sample/src/providers/product_detail_controller.dart';
 import 'package:sample/src/util/app_navigation.dart';
 
 class ProductDetailScreen extends StatefulWidget {
-  final Map<String, dynamic> product;
+  final int productId;
 
-  const ProductDetailScreen({super.key, required this.product});
+  const ProductDetailScreen({super.key, required this.productId});
 
   @override
   State<ProductDetailScreen> createState() => _ProductDetailScreenState();
@@ -18,11 +19,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
   bool _isFavorite = false;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  late ProductDetailController _controller;
 
   @override
   void initState() {
     super.initState();
-    _isFavorite = widget.product['isFavorite'] ?? false;
+    _controller = Provider.of<ProductDetailController>(context, listen: false);
 
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
@@ -32,6 +34,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
+
+    // Set product ID and fetch details
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _controller.setProductId(widget.productId);
+    });
 
     _animationController.forward();
   }
@@ -72,7 +79,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     // Show success message
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Added $_quantity ${widget.product['name']} to cart'),
+        content: Text('Added $_quantity ${_controller.productName} to cart'),
         backgroundColor: const Color(0xFF4CAF50),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -81,25 +88,67 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     );
   }
 
+  void _retryLoading() {
+    _controller.clearErrors();
+    _controller.getProductDetail();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: CustomScrollView(
-          slivers: [
-            _buildSliverAppBar(),
-            SliverToBoxAdapter(
-              child: Column(
-                children: [
-                  _buildProductInfo(),
-                  _buildDescriptionSection(),
-                  _buildQuantitySection(),
-                  _buildAddToCartButton(),
-                  const SizedBox(height: 32),
-                ],
-              ),
+      body: Consumer<ProductDetailController>(
+        builder: (context, controller, child) {
+          if (controller.isLoading && !controller.hasProductData) {
+            return _buildLoadingState();
+          }
+
+          if (controller.errorMessage != null && !controller.hasProductData) {
+            return _buildErrorState(controller.errorMessage!);
+          }
+
+          if (!controller.hasProductData) {
+            return _buildEmptyState();
+          }
+
+          return FadeTransition(
+            opacity: _fadeAnimation,
+            child: CustomScrollView(
+              slivers: [
+                _buildSliverAppBar(controller),
+                SliverToBoxAdapter(
+                  child: Column(
+                    children: [
+                      _buildProductInfo(controller),
+                      _buildDescriptionSection(controller),
+                      _buildQuantitySection(),
+                      _buildAddToCartButton(controller),
+                      const SizedBox(height: 32),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return const Scaffold(
+      backgroundColor: Color(0xFFF5F7FA),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4CAF50)),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Loading product details...',
+              style: TextStyle(fontSize: 16, color: Colors.black54),
             ),
           ],
         ),
@@ -107,7 +156,83 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     );
   }
 
-  Widget _buildSliverAppBar() {
+  Widget _buildErrorState(String errorMessage) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => NavigationService().popNavigation(),
+        ),
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 64, color: Colors.red[400]),
+              const SizedBox(height: 16),
+              Text(
+                'Error Loading Product',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[800],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                errorMessage,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _retryLoading,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4CAF50),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => NavigationService().popNavigation(),
+        ),
+      ),
+      body: const Center(
+        child: Text(
+          'Product not found',
+          style: TextStyle(fontSize: 18, color: Colors.black54),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSliverAppBar(ProductDetailController controller) {
     return SliverAppBar(
       expandedHeight: 400,
       pinned: true,
@@ -170,7 +295,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
           ),
           child: Center(
             child: Hero(
-              tag: 'product_${widget.product['name']}',
+              tag: 'product_${controller.productDetail?['id']}',
               child: Container(
                 width: 280,
                 height: 280,
@@ -178,10 +303,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                   borderRadius: BorderRadius.circular(20),
                   image: DecorationImage(
                     image: NetworkImage(
-                      widget.product['image'] ??
-                          'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
+                      controller.productImage.isNotEmpty
+                          ? controller.productImage
+                          : 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
                     ),
                     fit: BoxFit.cover,
+                    onError: (exception, stackTrace) {
+                      // Handle image loading error
+                      debugPrint('Image loading error: $exception');
+                    },
                   ),
                   boxShadow: [
                     BoxShadow(
@@ -199,7 +329,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     );
   }
 
-  Widget _buildProductInfo() {
+  Widget _buildProductInfo(ProductDetailController controller) {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -214,37 +344,41 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Price
-            Text(
-              widget.product['price'] ?? '\$0.00',
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF4CAF50),
-              ),
+            // Price section with discount
+            Row(
+              children: [
+                Text(
+                  controller.productPrice,
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF4CAF50),
+                  ),
+                ),
+                if (controller.hasDiscount) ...[
+                  const SizedBox(width: 12),
+                  Text(
+                    controller.originalPrice,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey,
+                      decoration: TextDecoration.lineThrough,
+                    ),
+                  ),
+                ],
+              ],
             ),
 
             const SizedBox(height: 8),
 
             // Product Name
             Text(
-              widget.product['name'] ?? 'Product Name',
+              controller.productName,
               style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.w600,
                 color: Colors.black87,
-              ),
-            ),
-
-            const SizedBox(height: 4),
-
-            // Unit
-            Text(
-              widget.product['unit'] ?? '1 unit',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
               ),
             ),
 
@@ -254,17 +388,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
             Row(
               children: [
                 ...List.generate(
-                  4,
+                  _getStarCount(controller.reviewsAverage),
                   (index) => const Icon(
                     Icons.star,
                     color: Color(0xFFFFD700),
                     size: 18,
                   ),
                 ),
-                const Icon(Icons.star_half, color: Color(0xFFFFD700), size: 18),
+                if (_hasHalfStar(controller.reviewsAverage))
+                  const Icon(
+                    Icons.star_half,
+                    color: Color(0xFFFFD700),
+                    size: 18,
+                  ),
+                ...List.generate(
+                  5 -
+                      _getStarCount(controller.reviewsAverage) -
+                      (_hasHalfStar(controller.reviewsAverage) ? 1 : 0),
+                  (index) => const Icon(
+                    Icons.star_border,
+                    color: Color(0xFFFFD700),
+                    size: 18,
+                  ),
+                ),
                 const SizedBox(width: 8),
                 Text(
-                  '4.5',
+                  controller.reviewsAverage,
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -273,7 +422,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '(38 reviews)',
+                  '(${controller.reviewsCount} reviews)',
                   style: TextStyle(fontSize: 14, color: Colors.grey[500]),
                 ),
               ],
@@ -284,7 +433,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     );
   }
 
-  Widget _buildDescriptionSection() {
+  int _getStarCount(String rating) {
+    double ratingValue = double.tryParse(rating) ?? 0.0;
+    return ratingValue.floor();
+  }
+
+  bool _hasHalfStar(String rating) {
+    double ratingValue = double.tryParse(rating) ?? 0.0;
+    return (ratingValue - ratingValue.floor()) >= 0.5;
+  }
+
+  Widget _buildDescriptionSection(ProductDetailController controller) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(top: 2),
@@ -295,7 +454,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              _getProductDescription(),
+              controller.productDescription,
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey[600],
@@ -303,23 +462,83 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                 fontWeight: FontWeight.w400,
               ),
             ),
-            const SizedBox(height: 12),
-            GestureDetector(
-              onTap: () {
-                // Show more description
-              },
-              child: const Text(
-                'more',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF4CAF50),
-                  fontWeight: FontWeight.w600,
+            if (controller.productContent.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              GestureDetector(
+                onTap: () {
+                  _showFullDescription(controller.productContent);
+                },
+                child: const Text(
+                  'more',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Color(0xFF4CAF50),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),
+    );
+  }
+
+  void _showFullDescription(String content) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder:
+          (context) => DraggableScrollableSheet(
+            initialChildSize: 0.6,
+            maxChildSize: 0.9,
+            minChildSize: 0.3,
+            builder:
+                (context, scrollController) => Container(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Product Details',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          controller: scrollController,
+                          child: Text(
+                            content,
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey[600],
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+          ),
     );
   }
 
@@ -410,7 +629,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     );
   }
 
-  Widget _buildAddToCartButton() {
+  Widget _buildAddToCartButton(ProductDetailController controller) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(top: 2),
@@ -460,28 +679,5 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
         ),
       ),
     );
-  }
-
-  String _getProductDescription() {
-    // Dynamic description based on product name
-    final productName = widget.product['name']?.toString().toLowerCase() ?? '';
-
-    if (productName.contains('organic')) {
-      return 'Organic Mountain works as a seller for many organic growers of organic lemons. Organic lemons are easy to spot in your produce aisle. They are just like regular lemons but they will usually have a few more scars on the outside of the lemon skin. Organic lemons are considered to be the world\'s finest lemon for juicing.';
-    } else if (productName.contains('peach')) {
-      return 'Fresh, juicy peaches picked at peak ripeness. These premium peaches are sweet, tender, and perfect for snacking, baking, or adding to your favorite recipes.';
-    } else if (productName.contains('avocado')) {
-      return 'Premium quality avocados that are perfectly ripe and ready to eat. Rich in healthy fats and nutrients, perfect for toast, salads, or guacamole.';
-    } else if (productName.contains('pineapple')) {
-      return 'Sweet and tropical pineapple, hand-picked for optimal sweetness and freshness. Great source of vitamin C and perfect for smoothies or snacking.';
-    } else if (productName.contains('grapes')) {
-      return 'Fresh, seedless grapes that are sweet and crispy. Perfect for snacking, adding to fruit salads, or enjoying as a healthy treat.';
-    } else if (productName.contains('pomegranate')) {
-      return 'Antioxidant-rich pomegranates with ruby red arils. Known for their health benefits and sweet-tart flavor, perfect for snacking or juicing.';
-    } else if (productName.contains('broccoli')) {
-      return 'Fresh, green broccoli crowns packed with vitamins and nutrients. Perfect for steaming, roasting, or adding to your favorite healthy recipes.';
-    } else {
-      return 'Fresh, high-quality produce carefully selected for optimal taste and nutrition. Perfect for healthy meals and snacking.';
-    }
   }
 }

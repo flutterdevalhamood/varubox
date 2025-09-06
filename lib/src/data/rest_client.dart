@@ -63,4 +63,17 @@ abstract class RestClient {
     @Field("id") int? id,
     @Field("deleteDescription") String? description,
   });
+
+  @GET('/api/Product/paginate/{page}/{limit}')
+  Future<dynamic> getDashboardProduct(
+    @Path("page") int page,
+    @Path("limit") int limit,
+    @Header("Authorization") String? token,
+  );
+
+  @GET('/api/ProductDetail/{id}')
+  Future<dynamic> getProductDetail({
+    @Path("id") int? id,
+    @Header("Authorization") String? token,
+  });
 }
