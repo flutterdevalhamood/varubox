@@ -160,11 +160,19 @@ class ProductDetailController with ChangeNotifier {
   void resetProductData() {
     productDetail = null;
     errorMessage = null;
+    id = null;
     notifyListeners();
   }
 
   // Set product ID and fetch details
   void setProductId(int productId) {
+    // Clear previous product data immediately when switching products
+    if (id != productId) {
+      productDetail = null;
+      errorMessage = null;
+      notifyListeners();
+    }
+
     id = productId;
     getProductDetail();
   }

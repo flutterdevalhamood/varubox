@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:sample/src/providers/cart_controller.dart';
+import 'package:sample/src/providers/favourites_controller.dart';
 import 'package:sample/src/providers/product_detail_controller.dart';
+// Add this import
 import 'package:sample/src/util/app_navigation.dart';
+import 'package:sample/src/util/app_routes.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final int productId;
@@ -16,15 +20,22 @@ class ProductDetailScreen extends StatefulWidget {
 class _ProductDetailScreenState extends State<ProductDetailScreen>
     with SingleTickerProviderStateMixin {
   int _quantity = 1;
-  bool _isFavorite = false;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
   late ProductDetailController _controller;
+  late CartController _cartController;
+  late FavoritesController _favoritesController;
 
   @override
   void initState() {
     super.initState();
     _controller = Provider.of<ProductDetailController>(context, listen: false);
+    _cartController = Provider.of<CartController>(context, listen: false);
+    _favoritesController = Provider.of<FavoritesController>(
+      context,
+      listen: false,
+    );
 
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
@@ -33,6 +44,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.elasticOut),
     );
 
     // Set product ID and fetch details
@@ -64,28 +79,116 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
   }
 
   void _toggleFavorite() {
-    setState(() {
-      _isFavorite = !_isFavorite;
-    });
+    if (!_controller.hasProductData) return;
 
     // Add haptic feedback
     HapticFeedback.lightImpact();
+
+    final productData = _controller.productDetail!;
+    final favoriteItem = FavoriteItem(
+      id: productData['id'].toString(),
+      name: _controller.productName,
+      price: _controller.productPrice.replaceAll('\$', ''), // Remove $ symbol
+      quantity: 1, // Default quantity when adding to favorites
+      weight: '1.0', // You might want to get this from product data
+      unit: 'kg', // You might want to get this from product data
+      imagePath:
+          _controller.productImage.isNotEmpty
+              ? _controller.productImage
+              : 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
+      backgroundColor: const Color(0xFFE8F5E8), // Default color
+    );
+
+    bool isCurrentlyFavorite = _favoritesController.isFavorite(favoriteItem.id);
+
+    if (isCurrentlyFavorite) {
+      _favoritesController.removeFromFavorites(favoriteItem.id);
+      _showSnackBar(
+        message: 'Removed from favorites',
+        icon: Icons.favorite_border,
+        color: Colors.grey[600]!,
+      );
+    } else {
+      _favoritesController.addToFavorites(favoriteItem);
+      _showSnackBar(
+        message: 'Added to favorites',
+        icon: Icons.favorite,
+        color: Colors.red,
+      );
+    }
+  }
+
+  void _showSnackBar({
+    required String message,
+    required IconData icon,
+    required Color color,
+  }) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(icon, color: Colors.white),
+            const SizedBox(width: 8),
+            Text(message),
+          ],
+        ),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   void _addToCart() {
+    if (!_controller.hasProductData) return;
+
     // Add haptic feedback
     HapticFeedback.mediumImpact();
 
-    // Show success message
+    // Add product to cart using the cart controller
+    _cartController.addToCart(_controller.productDetail!, _quantity);
+
+    // Show success message with cart info
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Added $_quantity ${_controller.productName} to cart'),
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Added $_quantity ${_controller.productName} to cart',
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                NavigationService().pushNavigation(Screenroutes.dashboard);
+              },
+              child: const Text(
+                'VIEW CART',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
         backgroundColor: const Color(0xFF4CAF50),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 4),
       ),
     );
+
+    // Reset quantity to 1 after adding to cart
+    setState(() {
+      _quantity = 1;
+    });
   }
 
   void _retryLoading() {
@@ -261,27 +364,101 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
         ),
       ),
       actions: [
-        Container(
-          margin: const EdgeInsets.all(8),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black12,
-                blurRadius: 8,
-                offset: Offset(0, 2),
+        // Cart icon with badge
+        Consumer<CartController>(
+          builder: (context, cartController, child) {
+            return Container(
+              margin: const EdgeInsets.all(8),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: IconButton(
-            icon: Icon(
-              _isFavorite ? Icons.favorite : Icons.favorite_border,
-              color: _isFavorite ? Colors.red : Colors.black87,
-              size: 20,
-            ),
-            onPressed: _toggleFavorite,
-          ),
+              child: Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.shopping_cart,
+                      color: Colors.black87,
+                      size: 20,
+                    ),
+                    onPressed: () => Navigator.pushNamed(context, '/cart'),
+                  ),
+                  if (cartController.itemCount > 0)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF4CAF50),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          '${cartController.itemCount}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
+        // Favorite icon with animation and proper state management
+        Consumer<FavoritesController>(
+          builder: (context, favoritesController, child) {
+            bool isFavorite =
+                controller.hasProductData &&
+                favoritesController.isFavorite(
+                  controller.productDetail!['id'].toString(),
+                );
+
+            return Container(
+              margin: const EdgeInsets.all(8),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ScaleTransition(
+                scale: _scaleAnimation,
+                child: IconButton(
+                  icon: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      isFavorite ? Icons.favorite : Icons.favorite_border,
+                      key: ValueKey(isFavorite),
+                      color: isFavorite ? Colors.red : Colors.black87,
+                      size: 20,
+                    ),
+                  ),
+                  onPressed: _toggleFavorite,
+                ),
+              ),
+            );
+          },
         ),
       ],
       flexibleSpace: FlexibleSpaceBar(
@@ -309,7 +486,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                     ),
                     fit: BoxFit.cover,
                     onError: (exception, stackTrace) {
-                      // Handle image loading error
                       debugPrint('Image loading error: $exception');
                     },
                   ),
@@ -636,46 +812,81 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
       decoration: const BoxDecoration(color: Colors.white),
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Container(
-          width: double.infinity,
-          height: 56,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF4CAF50), Color(0xFF45A049)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF4CAF50).withOpacity(0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: _addToCart,
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.shopping_bag, color: Colors.white, size: 24),
-                  SizedBox(width: 12),
-                  Text(
-                    'Add to cart',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
+        child: Consumer<CartController>(
+          builder: (context, cartController, child) {
+            bool isInCart =
+                controller.hasProductData &&
+                cartController.isInCart(controller.productDetail!['id']);
+
+            return Container(
+              width: double.infinity,
+              height: 56,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF4CAF50), Color(0xFF45A049)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF4CAF50).withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
                   ),
                 ],
               ),
-            ),
-          ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: _addToCart,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        isInCart
+                            ? Icons.shopping_bag
+                            : Icons.shopping_bag_outlined,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        isInCart ? 'Add More to Cart' : 'Add to Cart',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (isInCart) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${cartController.getItemQuantity(controller.productDetail!['id'])}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
