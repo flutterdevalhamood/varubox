@@ -605,7 +605,7 @@ class _DashboardContentState extends State<DashboardContent> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Product Image with badges
+            // Product Image with badges and labels
             Expanded(
               flex: 3,
               child: Stack(
@@ -651,6 +651,53 @@ class _DashboardContentState extends State<DashboardContent> {
                         ),
                       ),
                     ),
+
+                  // Product Labels
+                  if (product.publishedLabels.isNotEmpty)
+                    Positioned(
+                      top: product.hasDiscount ? 32 : 8,
+                      left: 8,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children:
+                            product.publishedLabels
+                                .take(
+                                  2,
+                                ) // Show maximum 2 labels to avoid overcrowding
+                                .map(
+                                  (label) => Container(
+                                    margin: const EdgeInsets.only(bottom: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: label.backgroundColor,
+                                      borderRadius: BorderRadius.circular(4),
+                                      border:
+                                          label.backgroundColor == Colors.white
+                                              ? Border.all(
+                                                color: Colors.grey.withOpacity(
+                                                  0.3,
+                                                ),
+                                                width: 1,
+                                              )
+                                              : null,
+                                    ),
+                                    child: Text(
+                                      label.name,
+                                      style: TextStyle(
+                                        color: label.foregroundColor,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                      ),
+                    ),
+
                   // Favorite button
                   Positioned(
                     top: 8,

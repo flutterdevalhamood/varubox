@@ -4,6 +4,50 @@ import 'package:flutter/material.dart';
 import '../data/rest_client.dart';
 import '../repo/auth_repo.dart';
 
+// Label model for product labels
+class ProductLabel {
+  final int id;
+  final String name;
+  final String color;
+  final String textColor;
+  final String status;
+
+  ProductLabel({
+    required this.id,
+    required this.name,
+    required this.color,
+    required this.textColor,
+    required this.status,
+  });
+
+  factory ProductLabel.fromJson(Map<String, dynamic> json) {
+    return ProductLabel(
+      id: json['id'] ?? 0,
+      name: json['name'] ?? '',
+      color: json['color'] ?? '#ffffff',
+      textColor: json['text_color'] ?? '#000000',
+      status: json['status'] ?? 'published',
+    );
+  }
+
+  // Convert hex color string to Color object
+  Color get backgroundColor {
+    try {
+      return Color(int.parse(color.replaceFirst('#', '0xff')));
+    } catch (e) {
+      return Colors.white;
+    }
+  }
+
+  Color get foregroundColor {
+    try {
+      return Color(int.parse(textColor.replaceFirst('#', '0xff')));
+    } catch (e) {
+      return Colors.black;
+    }
+  }
+}
+
 // Product model to handle API response
 class Product {
   final int id;
@@ -11,8 +55,10 @@ class Product {
   final String primaryImage;
   final String price;
   final String salePrice;
+  final String isFeatured;
   final String reviewsCount;
   final String reviewsAvg;
+  final List<ProductLabel> labels;
 
   Product({
     required this.id,
@@ -20,19 +66,32 @@ class Product {
     required this.primaryImage,
     required this.price,
     required this.salePrice,
+    required this.isFeatured,
     required this.reviewsCount,
     required this.reviewsAvg,
+    required this.labels,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
+    // Parse labels
+    List<ProductLabel> labelsList = [];
+    if (json['labels'] != null && json['labels'] is List) {
+      labelsList =
+          (json['labels'] as List)
+              .map((labelJson) => ProductLabel.fromJson(labelJson))
+              .toList();
+    }
+
     return Product(
       id: json['id'] ?? 0,
       name: json['Name'] ?? '',
       primaryImage: json['primary_image'] ?? '',
       price: json['price'] ?? '0.00',
       salePrice: json['sale_price'] ?? '0.00',
+      isFeatured: json['is_featured'] ?? '0',
       reviewsCount: json['reviews_count'] ?? '0',
       reviewsAvg: json['reviews_avg'] ?? '0',
+      labels: labelsList,
     );
   }
 
@@ -42,6 +101,13 @@ class Product {
   bool get hasDiscount => salePriceDouble < priceDouble;
   double get discountPercentage =>
       hasDiscount ? ((priceDouble - salePriceDouble) / priceDouble * 100) : 0.0;
+
+  // Check if product is featured
+  bool get isProductFeatured => isFeatured == '1';
+
+  // Get published labels only
+  List<ProductLabel> get publishedLabels =>
+      labels.where((label) => label.status == 'published').toList();
 }
 
 class DashboardController with ChangeNotifier {
@@ -171,14 +237,18 @@ class DashboardController with ChangeNotifier {
         .toList();
   }
 
-  // Get featured products (you can customize this logic)
+  // Get featured products (only products with is_featured = "1")
   List<Product> get featuredProducts {
-    // Return products with highest discount or newest products
-    List<Product> featured = List.from(products);
+    List<Product> featured =
+        products.where((product) => product.isProductFeatured).toList();
+
+    // Sort by discount percentage for better display
     featured.sort(
       (a, b) => b.discountPercentage.compareTo(a.discountPercentage),
     );
-    return featured.take(6).toList(); // Return top 6 products
+
+    debugPrint('Featured products count: ${featured.length}');
+    return featured;
   }
 
   // Standardized error handling

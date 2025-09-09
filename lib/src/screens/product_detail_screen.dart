@@ -223,7 +223,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                   child: Column(
                     children: [
                       _buildProductInfo(controller),
-                      _buildDescriptionSection(controller),
+                      _buildLabelsSection(controller),
+                      _buildDescriptionAndFAQSection(controller),
                       _buildQuantitySection(),
                       _buildAddToCartButton(controller),
                       const SizedBox(height: 32),
@@ -470,39 +471,95 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
               colors: [const Color(0xFFF0F8F0), Colors.white.withOpacity(0.9)],
             ),
           ),
-          child: Center(
-            child: Hero(
-              tag: 'product_${controller.productDetail?['id']}',
-              child: Container(
-                width: 280,
-                height: 280,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  image: DecorationImage(
-                    image: NetworkImage(
-                      controller.productImage.isNotEmpty
-                          ? controller.productImage
-                          : 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
+          child: Stack(
+            children: [
+              Center(
+                child: Hero(
+                  tag: 'product_${controller.productDetail?['id']}',
+                  child: Container(
+                    width: 280,
+                    height: 280,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      image: DecorationImage(
+                        image: NetworkImage(
+                          controller.productImage.isNotEmpty
+                              ? controller.productImage
+                              : 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
+                        ),
+                        fit: BoxFit.cover,
+                        onError: (exception, stackTrace) {
+                          debugPrint('Image loading error: $exception');
+                        },
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
                     ),
-                    fit: BoxFit.cover,
-                    onError: (exception, stackTrace) {
-                      debugPrint('Image loading error: $exception');
-                    },
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
                 ),
               ),
-            ),
+              // Labels positioned on the image
+              if (controller.productLabels.isNotEmpty)
+                Positioned(
+                  top: 80,
+                  left: 24,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children:
+                        controller.productLabels
+                            .map(
+                              (label) => Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _parseColor(
+                                    label['color'] ?? '#4CAF50',
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.1),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Text(
+                                  label['name'] ?? '',
+                                  style: TextStyle(
+                                    color: _parseColor(
+                                      label['text_color'] ?? '#FFFFFF',
+                                    ),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
     );
+  }
+
+  Color _parseColor(String colorString) {
+    try {
+      return Color(int.parse(colorString.replaceFirst('#', '0xFF')));
+    } catch (e) {
+      return const Color(0xFF4CAF50); // Default green color
+    }
   }
 
   Widget _buildProductInfo(ProductDetailController controller) {
@@ -609,6 +666,66 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     );
   }
 
+  Widget _buildLabelsSection(ProductDetailController controller) {
+    if (controller.productLabels.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 2),
+      decoration: const BoxDecoration(color: Colors.white),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Product Labels',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children:
+                  controller.productLabels
+                      .map(
+                        (label) => Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _parseColor(label['color'] ?? '#4CAF50'),
+                            borderRadius: BorderRadius.circular(25),
+                            border: Border.all(
+                              color: Colors.grey.shade300,
+                              width: 1,
+                            ),
+                          ),
+                          child: Text(
+                            label['name'] ?? '',
+                            style: TextStyle(
+                              color: _parseColor(
+                                label['text_color'] ?? '#FFFFFF',
+                              ),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   int _getStarCount(String rating) {
     double ratingValue = double.tryParse(rating) ?? 0.0;
     return ratingValue.floor();
@@ -619,102 +736,138 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     return (ratingValue - ratingValue.floor()) >= 0.5;
   }
 
-  Widget _buildDescriptionSection(ProductDetailController controller) {
+  Widget _buildDescriptionAndFAQSection(ProductDetailController controller) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(top: 2),
       decoration: const BoxDecoration(color: Colors.white),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
+      child: DefaultTabController(
+        length: 2,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              controller.productDescription,
-              style: TextStyle(
+            const TabBar(
+              labelColor: Color(0xFF4CAF50),
+              unselectedLabelColor: Colors.grey,
+              indicatorColor: Color(0xFF4CAF50),
+              labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              unselectedLabelStyle: TextStyle(
                 fontSize: 16,
-                color: Colors.grey[600],
-                height: 1.5,
                 fontWeight: FontWeight.w400,
               ),
+              tabs: [Tab(text: 'Description'), Tab(text: 'FAQ')],
             ),
-            if (controller.productContent.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              GestureDetector(
-                onTap: () {
-                  _showFullDescription(controller.productContent);
-                },
-                child: const Text(
-                  'more',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Color(0xFF4CAF50),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+            SizedBox(
+              height: 300, // Fixed height for the tab view content
+              child: TabBarView(
+                children: [
+                  _buildDescriptionTab(controller),
+                  _buildFAQTab(controller),
+                ],
               ),
-            ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  void _showFullDescription(String content) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder:
-          (context) => DraggableScrollableSheet(
-            initialChildSize: 0.6,
-            maxChildSize: 0.9,
-            minChildSize: 0.3,
-            builder:
-                (context, scrollController) => Container(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Product Details',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          controller: scrollController,
-                          child: Text(
-                            content,
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey[600],
-                              height: 1.5,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+  Widget _buildDescriptionTab(ProductDetailController controller) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            controller.productDescription,
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey[600],
+              height: 1.5,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          if (controller.productContent.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            ExpansionTile(
+              title: const Text(
+                'More Details',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF4CAF50),
+                ),
+              ),
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: const EdgeInsets.only(top: 8),
+              children: [
+                Text(
+                  controller.productContent,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    height: 1.5,
                   ),
                 ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFAQTab(ProductDetailController controller) {
+    if (controller.productFaqs.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'No FAQs available for this product.',
+            style: TextStyle(fontSize: 16, color: Colors.grey),
           ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: controller.productFaqs.length,
+      itemBuilder: (context, index) {
+        final faq = controller.productFaqs[index];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade200),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: ExpansionTile(
+            title: Text(
+              faq['question'] ?? '',
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            tilePadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
+            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            shape: const Border(),
+            children: [
+              Text(
+                controller.stripHtmlTags(faq['answer'] ?? ''),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

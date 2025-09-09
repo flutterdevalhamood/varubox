@@ -27,6 +27,10 @@ class ProductDetailController with ChangeNotifier {
       productDetail?['reviews_avg']?.toString() ?? '0.0';
   List<dynamic> get productImages => productDetail?['product_images'] ?? [];
 
+  // New properties for labels and FAQs
+  List<dynamic> get productLabels => productDetail?['labels'] ?? [];
+  List<dynamic> get productFaqs => productDetail?['faqs'] ?? [];
+
   // Check if product has sale price
   bool get hasDiscount =>
       productDetail?['sale_price'] != null &&
@@ -79,6 +83,8 @@ class ProductDetailController with ChangeNotifier {
       if (productDetailData['IsSuccess'] == true) {
         productDetail = productDetailData['Data'] as Map<String, dynamic>;
         debugPrint("Product detail loaded: ${productDetail?['Name']}");
+        debugPrint("Labels count: ${productLabels.length}");
+        debugPrint("FAQs count: ${productFaqs.length}");
       } else {
         errorMessage =
             productDetailData['Message'] ?? 'Failed to fetch product details';
@@ -110,6 +116,48 @@ class ProductDetailController with ChangeNotifier {
     result = result.replaceAll(RegExp(r'\s+'), ' ').trim();
 
     return result;
+  }
+
+  // Public method to strip HTML tags (used in the UI)
+  String stripHtmlTags(String htmlString) {
+    return _stripHtmlTags(htmlString);
+  }
+
+  // Helper method to get label by status
+  List<dynamic> getPublishedLabels() {
+    return productLabels
+        .where((label) => label['status'] == 'published')
+        .toList();
+  }
+
+  // Helper method to get FAQ by status
+  List<dynamic> getPublishedFaqs() {
+    return productFaqs.where((faq) => faq['status'] == 'published').toList();
+  }
+
+  // Helper method to check if product has any labels
+  bool get hasLabels => productLabels.isNotEmpty;
+
+  // Helper method to check if product has any FAQs
+  bool get hasFaqs => productFaqs.isNotEmpty;
+
+  // Helper method to get label colors
+  Color getLabelBackgroundColor(Map<String, dynamic> label) {
+    try {
+      String colorString = label['color'] ?? '#4CAF50';
+      return Color(int.parse(colorString.replaceFirst('#', '0xFF')));
+    } catch (e) {
+      return const Color(0xFF4CAF50); // Default green color
+    }
+  }
+
+  Color getLabelTextColor(Map<String, dynamic> label) {
+    try {
+      String colorString = label['text_color'] ?? '#FFFFFF';
+      return Color(int.parse(colorString.replaceFirst('#', '0xFF')));
+    } catch (e) {
+      return const Color(0xFFFFFFFF); // Default white color
+    }
   }
 
   // Standardized error handling
